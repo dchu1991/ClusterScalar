@@ -1,0 +1,18 @@
+L = 16 8 8 8
+
+formulation = continuum
+kappa = 0.13135
+lambda = 0.15
+
+metropolis_local_hits = 10
+metropolis_global_hits = 1
+metropolis_delta = 4.7
+
+cluster_hits = 3
+cluster_min_size = 0.5
+
+start_measure = 1
+total_measure = 10
+measure_every_X_updates = 1
+
+outpath = .

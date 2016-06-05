@@ -1,0 +1,47 @@
+# Just the lattice size
+L = 16 8 8 8
+
+# The two parameter of our theory, lambda and kappa. "formulation" can be set
+# to continuum which changes lambda from the lattice to the continuum 
+# formulation, namely lambda = 4*kappa*kappa*lambda. This way might be easier to
+# keep lambda in the continuum notation constant
+formulation = continuum
+kappa = 0.13135
+lambda = 0.15
+
+# Every full update step consists of a Metropolis step first and a cluster step
+# second.
+
+# "local_hits" gives the number of local hits on each lattice site. This is
+# computationally faster than just increasing the number of global hits.
+# "global_hits" gives the number of how many times a metropolis step is
+# performed before performing a cluster step.
+# "delta" is the spread of the updated field, it should be tuned in a way,
+# that the metropolis acceptance is around 0.24!
+metropolis_local_hits = 10
+metropolis_global_hits = 1
+metropolis_delta = 4.7
+
+# "hits" is the number of how often a cluster is build in one full MonteCarlo
+# step. It might be advanteougus that this number if greater than the number
+# of global hits of the metropolis.
+# "min_size" is the minimal cluster size in one iteration step. It should be
+# between 0 and 1 and is the number in percent of lattice sites embedded in 
+# the cluster. I would not suggest to make it too big, since new cluster
+# origins are choosen randomly which might be slow, if too much of the lattice
+# already belongs to the cluster.
+cluster_hits = 3
+cluster_min_size = 0.5
+
+# Measurements are started after "start_measure" configs are created to avoid
+# thermalisation effects. "total_measure" gives the total number of measurements
+# you want to perform. "measure_every_X_updates" gives the separation between 
+# configs. 
+start_measure = 100
+total_measure = 1000
+measure_every_X_updates = 1
+
+# Just the "outpath" where the measurements should be stored. BE CAREFUL:
+# If MonteCarlo parameter are changed the filename is not changed and data
+# are overwritten!
+outpath = .
