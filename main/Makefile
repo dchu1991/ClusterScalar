@@ -38,7 +38,7 @@ INCPATH = ../include \
 
 # additional libraries
 
-LIBS = boost_program_options lime 
+LIBS =
 
 LIBPATH = /usr/local/lib
 
