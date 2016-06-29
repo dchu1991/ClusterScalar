@@ -34,7 +34,7 @@ LOGOPTION =
 
 # additional include directories
 INCPATH = ../include \
-          /data2/Simulation/Test/fermiqcd/Libraries
+          ../../fermiqcd/Libraries
 
 # additional libraries
 
@@ -43,14 +43,18 @@ LIBS =
 LIBPATH = /usr/local/lib
 
 # scheduling and optimization options
-CFLAGS = -Wall -pedantic -std=c++11 -march=native -DLINUX -O3 \
-         -Wno-unused-variable -Wno-unused-local-typedefs -Wno-sign-compare \
-         -Wno-sequence-point
+CFLAGS = -Wall -pedantic -std=c++11 -O2 -ipo -axCORE-AVX2 \
+         -mtune=native -march=native \
+         -Wno-unused-variable -Wno-sign-compare -Wno-sequence-point
+#CFLAGS = -Wall -pedantic -std=c++11 -march=native -DLINUX -O3 \
+#         -Wno-unused-variable -Wno-unused-local-typedefs -Wno-sign-compare \
+#         -Wno-sequence-point
 #         -lboost_system -lboost_filesystem
 ######################## Be careful when changing ##############################
 
 SHELL=/bin/bash
-CC=g++
+#CC=g++
+CC=icpc
 CLINKER=$(CC)
 
 PGMS= $(MAIN) $(MODULES)

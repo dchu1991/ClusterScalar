@@ -1,5 +1,6 @@
 #include <array>
 #include <cmath>
+#include <ctime>
 #include <vector>
 
 #include "mdp.h"
@@ -112,33 +113,34 @@ double metropolis_update(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
 
   double acc = .0;
   for(int parity=EVEN; parity<=ODD; parity++) {
-    forallsitesofparity(x,parity) {
+    forallsitesofparity(x, parity) {
       // computing phi^2 on x
       auto phiSqr = phi(x)[0]*phi(x)[0] + phi(x)[1]*phi(x)[1] + 
                     phi(x)[2]*phi(x)[2] + phi(x)[3]*phi(x)[3];
       // running over the four components, comp, of the phi field - Each 
       // component is updated individually with multiple hits
       for(size_t comp = 0; comp < 4; comp++){
-        auto Phi = phi(x)[comp]; // just a copy for simplicity
+        auto& Phi = phi(x)[comp]; // this reference gives a speedup
         // compute the neighbour sum
         auto neighbourSum = 0.0;
         for(size_t dir = 0; dir < 4; dir++) // dir = direction
           neighbourSum += phi(x-dir)[comp] + phi(x+dir)[comp];
-        // doint the multihit
+        // doing the multihit
+
         for(size_t hit = 0; hit < nb_of_hits; hit++){
           auto deltaPhi = (mdp_random.plain()*2. - 1.)*delta;
-          auto deltaPhiPhi = deltaPhi * phi(x)[comp];
+          auto deltaPhiPhi = deltaPhi * Phi;
           auto deltaPhideltaPhi = deltaPhi * deltaPhi;
           // change of action
           auto dS = -2.*kappa*deltaPhi*neighbourSum + 
-                     2.*deltaPhiPhi*(1. - 2.*lambda*(1. - phiSqr - deltaPhi*deltaPhi)) +
+                     2.*deltaPhiPhi*(1. - 2.*lambda*(1. - phiSqr - deltaPhideltaPhi)) +
                      deltaPhideltaPhi*(1. - 2.*lambda*(1. - phiSqr)) +
                      lambda*(4.*deltaPhiPhi*deltaPhiPhi + deltaPhideltaPhi*deltaPhideltaPhi);
           // Monate Carlo accept reject step -------------------------------------
           if(mdp_random.plain() < exp(-dS)) {
-            phiSqr -= phi(x)[comp]*phi(x)[comp];
-            phi(x)[comp] += deltaPhi;
-            phiSqr += phi(x)[comp]*phi(x)[comp];
+            phiSqr -= Phi*Phi;
+            Phi += deltaPhi;
+            phiSqr += Phi*Phi;
             acc++; 
           }
         } // multi hit ends here
@@ -175,6 +177,7 @@ inline void check_neighbour(const size_t x_look, const size_t y,
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 double cluster_update(mdp_field<std::array<double, 4> >& phi, mdp_site& x, 
+                      std::vector<size_t>& look_1, std::vector<size_t>& look_2,
                       const double kappa, const double min_size){
 
   // lookuptable to check which lattice points will be flipped
@@ -193,7 +196,7 @@ double cluster_update(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
   while(double(cluster_size)/x.lattice().nvol <= min_size){
 
     // lookuptables to build the cluster
-    std::vector<size_t> look_1(0, 0), look_2(0, 0);
+//    std::vector<size_t> look_1(0, 0), look_2(0, 0);
 
     // Choose a random START POINT for the cluster: 0 <= xx < volume and check 
     // if the point is already part of another cluster - if so another start 
@@ -298,9 +301,11 @@ int main(int argc, char** argv) {
       exit(1);
   }
 
+  std::vector<size_t> look_1(0, 0), look_2(0, 0); // lookuptables for the cluster
   // The update ----------------------------------------------------------------
   for(int ii = 0; ii < params.data.start_measure+params.data.total_measure; ii++) {
 
+    clock_t begin = clock(); // start time for one update step
     // metropolis update
     double acc = 0.0;
     for(int global_metro_hits = 0; 
@@ -311,12 +316,15 @@ int main(int argc, char** argv) {
                                params.data.metropolis_local_hits);
     acc /= params.data.metropolis_global_hits;
 
+    clock_t mid = clock(); // start time for one update step
+
     // cluster update
     double cluster_size = 0.0;
     for(size_t nb = 0; nb < params.data.cluster_hits; nb++)
-      cluster_size += cluster_update(phi, x, params.data.kappa, 
+      cluster_size += cluster_update(phi, x, look_1, look_2, params.data.kappa, 
                                      params.data.cluster_min_size);
     cluster_size /= params.data.cluster_hits;
+    clock_t end = clock(); // end time for one update step
 
     // compute magnetisation every ZZZ configuration
     if(ii > params.data.start_measure &&
@@ -326,9 +334,12 @@ int main(int argc, char** argv) {
       M = compute_magnetisation(phi_rot, x);
       mdp.add(M); // adding magnetisation and acceptance rate in parallel
       mdp.add(acc);
-      mdp << ii << "\tmagnetization after rotation = " << M/V;
-      mdp << "  \taccaptance rate = " << acc/V 
-          << "  \tcluster size = " << 100.*cluster_size/V << endl;
+      mdp << ii << "\tmag after rot = " << M/V;
+      mdp << "  \tacc. rate = " << acc/V 
+          << "  \tcluster size = " << 100.*cluster_size/V 
+          << "\ttime metro = " << double(mid - begin) / CLOCKS_PER_SEC 
+          << "\ttime clust = " << double(end - mid) / CLOCKS_PER_SEC 
+          << endl;
       fprintf(f_mag, "%.14lf\n", M/V);
     }
   }

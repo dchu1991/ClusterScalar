@@ -1,4 +1,4 @@
-L = 16 8 8 8
+L = 40 20 20 20
 
 formulation = continuum
 kappa = 0.13135
@@ -8,11 +8,11 @@ metropolis_local_hits = 10
 metropolis_global_hits = 1
 metropolis_delta = 4.7
 
-cluster_hits = 3
-cluster_min_size = 0.5
+cluster_hits = 32
+cluster_min_size = 0.1 
 
 start_measure = 1
-total_measure = 10
+total_measure = 30
 measure_every_X_updates = 1
 
 outpath = .
