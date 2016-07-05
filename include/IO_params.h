@@ -28,9 +28,14 @@ struct LatticeDataContainer { // Just the thing that holds all variables
   int cluster_hits;
   double cluster_min_size;
   // run parameter
+  int seed;
+  int restart;
+  int replica;
   int start_measure;
   int total_measure;
   int measure_every_X_updates;
+  std::string save_config;
+  int save_config_every_X_updates;
   std::string outpath;
 };
 // -----------------------------------------------------------------------------
@@ -94,10 +99,23 @@ private:
     reader += fscanf(infile, "cluster_hits = %d\n", &data.cluster_hits);
     reader += fscanf(infile, "cluster_min_size = %lf\n", &data.cluster_min_size);
     // configs
+    reader += fscanf(infile, "seed = %d\n", &data.seed);
+    reader += fscanf(infile, "restart = %d\n", &data.restart);
+    reader += fscanf(infile, "replica = %d\n", &data.replica);
     reader += fscanf(infile, "start_measure = %d\n", &data.start_measure);
+    if(data.restart < 0 || data.replica < 0){
+      mdp << "restart and replica value must not be negative!" << endl;
+      exit(0);
+    }
+    data.start_measure += data.restart;
+
     reader += fscanf(infile, "total_measure = %d\n", &data.total_measure);
     reader += fscanf(infile, "measure_every_X_updates = %d\n", 
                              &data.measure_every_X_updates);
+    reader += fscanf(infile, "save_config = %255s\n", readin);
+    data.save_config.assign(readin);
+    reader += fscanf(infile, "save_config_every_X_updates = %d\n", 
+                             &data.save_config_every_X_updates);
     reader += fscanf(infile, "outpath = %255s\n", readin);
     data.outpath.assign(readin);
 
