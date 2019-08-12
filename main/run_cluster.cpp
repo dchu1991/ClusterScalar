@@ -19,7 +19,7 @@ typedef enum cluster_state_t {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 inline double compute_magnetisation(mdp_field<std::array<double, 4> >& phi, 
-                             mdp_site& x){
+                                    mdp_site& x){
 
   double m0 = 0.0, m1 = 0.0, m2 = 0.0, m3 = 0.0;
   forallsites(x){
@@ -160,9 +160,11 @@ double metropolis_update(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
 inline void check_neighbour(const size_t y, 
                             const double scalar_x,
                             const std::array<double, 4>& phi_y,
-                            const std::array<double, 4>& r, size_t& cluster_size,
+                            const std::array<double, 4>& r, 
+                            size_t& cluster_size,
                             std::vector<cluster_state_t>& checked_points,
-                            std::vector<int>& look, size_t& look_size){
+                            std::vector<int>& look, 
+                            size_t& look_size){
 
   if(checked_points.at(y) == CLUSTER_UNCHECKED){
     double scalar_y = phi_y[0]*r[0] + phi_y[1]*r[1] + 
@@ -177,9 +179,12 @@ inline void check_neighbour(const size_t y,
 }
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-double cluster_update(mdp_field<std::array<double, 4> >& phi, mdp_site& x, 
-                      std::vector<int>& look_1, std::vector<int>& look_2,
-                      const double kappa, const double min_size){
+inline double cluster_update(mdp_field<std::array<double, 4> >& phi, 
+                      mdp_site& x, 
+                      std::vector<int>& look_1, 
+                      std::vector<int>& look_2,
+                      const double kappa, 
+                      const double min_size){
 
   // lookuptable to check which lattice points will be flipped
   std::vector<cluster_state_t> 
@@ -210,7 +215,7 @@ double cluster_update(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
     // run over both lookuptables until there are no more points to update -----
     while(look_1[0] != -1){ 
       // run over first lookuptable and building up second lookuptable
-      for(const auto& x_look : look_1){ 
+      for(const auto& x_look : look_1){
         if(x_look == -1) break;
         double scalar_x = -4.*kappa * (phi(x_look)[0]*r[0] + phi(x_look)[1]*r[1] + 
                                        phi(x_look)[2]*r[2] + phi(x_look)[3]*r[3]);
@@ -226,10 +231,10 @@ double cluster_update(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
         }
       }
       // run over second lookuptable and building up first lookuptable
-      for(size_t i = 0; i <= look_1_size; i++) 
+      for(size_t i = 0; i <= look_1_size; i++)
         look_1[i] = -1;
       look_1_size = 0;
-      for(const auto& x_look : look_2){ 
+      for(const auto& x_look : look_2){
         if(x_look == -1) break;
         double scalar_x = -4.*kappa * (phi(x_look)[0]*r[0] + phi(x_look)[1]*r[1] + 
                                        phi(x_look)[2]*r[2] + phi(x_look)[3]*r[3]);
@@ -306,12 +311,29 @@ int main(int argc, char** argv) {
                          "Y" + std::to_string(params.data.L[2]) +
                          "Z" + std::to_string(params.data.L[3]) +
                          "kap" + std::to_string(params.data.kappa) + 
-                         "lam" + std::to_string(params.data.lambda) + ".dat";
+                         "lam" + std::to_string(params.data.lambda) + 
+                         ".rep_" + std::to_string(params.data.replica) +
+                         ".dat";
   FILE *f_mag = fopen(mag_file.c_str(), "w"); 
   if (f_mag == NULL) {
       printf("Error opening file!\n");
       exit(1);
   }
+  std::string cluster_size_file = params.data.outpath + 
+                         "/clusterSize.T" + std::to_string(params.data.L[0]) +
+                         "X" + std::to_string(params.data.L[1]) +
+                         "Y" + std::to_string(params.data.L[2]) +
+                         "Z" + std::to_string(params.data.L[3]) +
+                         "kap" + std::to_string(params.data.kappa) + 
+                         "lam" + std::to_string(params.data.lambda) + 
+                         ".rep_" + std::to_string(params.data.replica) +
+                         ".dat";
+  FILE *f_cluster = fopen(cluster_size_file.c_str(), "w"); 
+  if (f_cluster == NULL) {
+      printf("Error opening file!\n");
+      exit(1);
+  }
+  /*
   if(params.data.restart != 0){
     std::string conf_file = params.data.outpath + 
                             "/T" + std::to_string(params.data.L[0]) +
@@ -332,7 +354,7 @@ int main(int argc, char** argv) {
                             ".conf" + std::to_string(params.data.restart) + 
                             ".random_generator_state";
     random1.read_state(rnd_state_filename);
-  }
+  }*/
 
   std::vector<int> look_1(V, -1), look_2(V, -1); // lookuptables for the cluster
   // The update ----------------------------------------------------------------
@@ -352,12 +374,21 @@ int main(int argc, char** argv) {
     clock_t mid = clock(); // start time for one update step
 
     // cluster update
-    double cluster_size = 0.0;
-    for(size_t nb = 0; nb < params.data.cluster_hits; nb++)
-      cluster_size += cluster_update(phi, x, look_1, look_2, params.data.kappa, 
+    double cluster_size = 0.0 ;
+    size_t tmp ;
+    for(size_t nb = 0; nb < params.data.cluster_hits; nb++){
+      tmp = cluster_update(phi, x, look_1, look_2, params.data.kappa, 
                                      params.data.cluster_min_size);
+      cluster_size += tmp;
+      //mdp << "cluster of total size = " << tmp << " formed\n" ;
+      fprintf(f_cluster,"%d\t",tmp);
+      }
     cluster_size /= params.data.cluster_hits;
     clock_t end = clock(); // end time for one update step
+    fprintf(f_cluster,"\n");
+    fflush(f_cluster);
+    //mdp << "\n" << cluster_size << "\n";
+    
 
     // compute magnetisation every ZZZ configuration
     if(ii > params.data.start_measure &&
@@ -376,7 +407,8 @@ int main(int argc, char** argv) {
       fprintf(f_mag, "%.14lf\n", M/V);
       fflush(f_mag);
     }
-    if(params.data.save_config == "yes" && ii > params.data.start_measure &&
+    
+    /*if(params.data.save_config == "yes" && ii > params.data.start_measure &&
        ii%params.data.save_config_every_X_updates == 0){
       std::string conf_file = params.data.outpath + 
                               "/T" + std::to_string(params.data.L[0]) +
@@ -396,12 +428,15 @@ int main(int argc, char** argv) {
                               ".lam" + std::to_string(params.data.lambda)+
                               ".conf" + std::to_string(ii) + 
                               ".random_generator_state";
-      random1.write_state(rnd_state_filename);
-    }
+      random1.
+      //random1.write_state(rnd_state_filename);
+    }*/
+    
   }
 
   // end everything
   fclose(f_mag);
+  fclose(f_cluster);
   mdp.close_wormholes();
   return 0;
 }

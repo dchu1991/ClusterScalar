@@ -50,63 +50,19 @@ inline void get_phi_field_unit_vec(mdp_field<std::array<double, 4> >& phi,
     dir[3] += phi(x)[3];
   }
   inv_length = 1/sqrt( dir[0]*dir[0] + dir[1]*dir[1] +
-		           dir[2]*dir[2] + dir[3]*dir[3] );
+		                   dir[2]*dir[2] + dir[3]*dir[3] );
   for (int i = 0; i < 4; i++)
     dir[i] *= inv_length; // such that ||dir|| = 1
 
 }
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-inline void Rescale(mdp_field<std::array<double, 4> >& phi_rescale,
-                    mdp_field<std::array<double, 4> >& phi, mdp_site& x,
+inline void Rescale(mdp_field<std::array<double, 4> >& phi_rescale, mdp_site& x,
                     const double Scale_factor){
   forallsites(x){
     for (int i = 0; i < 4; i++ )  
-      phi_rescale(x)[i] = sqrt(Scale_factor)*phi(x)[i];
+      phi_rescale(x)[i] *= sqrt(Scale_factor);
   }
-}
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-inline void Projection(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
-		                   fftw_complex* const output){
-		                   //std::vector<fftw_complex>& output){
-
-  std::array<double,4> dir;
-  get_phi_field_unit_vec(phi, x, dir);
-  
-  forallsites(x){
-    // compute Higgs Projection
-    output[5*x.global_index()+0][0] = 
-                       phi(x)[0]*dir[0] + phi(x)[1]*dir[1] +
-		       phi(x)[2]*dir[2] + phi(x)[3]*dir[3];
-
-    // compute Goldstone Projection
-    for (int i = 0; i < 4; i++) 
-	    output[5*x.global_index()+1+i][0] = 
-            phi(x)[i] - output[5*x.global_index()+0][0]*dir[i];
-    for(size_t i = 0; i < 5; i++)
-      output[5*x.global_index()+i][1] = 0.0;
-	}
-
-} // fingers crossed...
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-//double HProp(int comp, std::vector<fftw_complex>& output, const double V){
-inline double HProp(const int comp, fftw_complex const * const output, const double V){
-  double tmp = output[5*comp+0][0] * output[5*comp+0][0] +
-               output[5*comp+0][1] * output[5*comp+0][1];
-  return tmp/V;
-}
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-//double GProp(int comp, std::vector<fftw_complex>& output, const double V){
-inline double GProp(const int comp, fftw_complex const * const output, const double V){
-  double tmp = 0.0;
-  for (int i = 1; i < 5; i++)
-    tmp += output[5*comp+i][0] * output[5*comp+i][0]+
-           output[5*comp+i][1] * output[5*comp+i][1];
-
-  return tmp/(3*V);
 }
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,45 +79,67 @@ inline int Flag(const double momSqr, const int SlotCnt,
 }
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-//double GetHiggsComponent(std::vector<fftw_complex>& output,
-inline double GetHiggsComponent(fftw_complex const * const output,
+
+
+// holy shit......
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+inline void Not_Projection(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
+		                    fftw_complex* const output){
+		                   
+  std::array<double,4> dir;
+  get_phi_field_unit_vec(phi, x, dir);
+  
+  forallsites(x){
+    for(int i = 0; i < 4 ; i++){
+      output[4*x.global_index()+i][0] = phi(x)[i];
+      output[4*x.global_index()+i][1] = 0.0;
+    }
+  }
+}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+inline double PropComponent(const int comp, fftw_complex const * const output,
+                   const double V, const int i){
+  double tmp = output[4*comp+i][0] * output[4*comp+i][0] +
+               output[4*comp+i][1] * output[4*comp+i][1];
+  return tmp/V;
+}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+inline double GetPropComponent(fftw_complex const * const output,
                     const std::vector<double>& sinPSqr, 
-                    const std::vector<double>& DifferentMomenta, const int comp,
-                    const int V){
+                    const std::vector<double>& DifferentMomenta, 
+                    const int comp, const int V, const int j){
   int counter = 0;
   double tmp = 0.0;
   for (int i = 0; i < V; i++){
     if ( fabs(DifferentMomenta[comp]-sinPSqr[i]) < 1E-9 ){
-      tmp += HProp(i, output, V);
-      counter++;
-    }
-  }
-  return tmp/counter;
-
-}
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-//double GetGoldstoneComponent(std::vector<fftw_complex>& output,
-inline double GetGoldstoneComponent(fftw_complex const * const output,
-                    const std::vector<double>& sinPSqr, 
-                    const std::vector<double>& DifferentMomenta, const int comp,
-                    const int V){
-  int counter = 0;
-  double tmp = 0.0;
-  for (int i = 0; i < V; i++){
-    if ( fabs(DifferentMomenta[comp]-sinPSqr[i]) < 1E-9 ){
-      tmp += GProp(i, output, V);
+      tmp += PropComponent(i, output, V, j);
       counter++;
     }
   }
   return tmp/counter;
 }
-
 ////////////////////////////////////////////////////////////////////////////////
-//////////////////// Only these are necessary, I hope... ///////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+inline void Compute_UnprojectedCorrelatorObs(mdp_field<std::array<double,4> >& phi,
+                               mdp_site& x, 
+                               std::vector<double>& CorrelatorObs,
+                               const double factor){
 
-
+  forallsites(x){
+    CorrelatorObs[4*x(0)+0] += phi(x)[0];
+    CorrelatorObs[4*x(0)+1] += phi(x)[1];
+    CorrelatorObs[4*x(0)+2] += phi(x)[2];
+    CorrelatorObs[4*x(0)+3] += phi(x)[3];
+  }
+  
+  for(std::vector<int>::size_type i = 0; i != CorrelatorObs.size(); i++)    
+    CorrelatorObs[i] *= factor;
+}
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 inline void get_phi_field_direction(mdp_field<std::array<double, 4> >& phi, 
@@ -400,6 +378,7 @@ int main(int argc, char** argv) {
   int L[]={params.data.L[0], params.data.L[1],
            params.data.L[2], params.data.L[3]} ;
   const int V = params.data.V;
+  const double rescale_factor = double(L[0])/double(V);
   const double kappa = 0.13137;
   const double lambda = 0.01035;
   const double delta = 4.7; // update parameter for new phi 
@@ -429,27 +408,40 @@ int main(int argc, char** argv) {
                             ".Z" + std::to_string(params.data.L[3]) +
                             ".kap" + std::to_string(params.data.kappa) + 
                             ".lam" + std::to_string(params.data.lambda) + 
-                            ".rep_" + std::to_string(params.data.replica) + 
-                            ".dat";
+                            ".rep_" + std::to_string(params.data.replica);
   std::string mag_file = params.data.outpath + "/mag.T" + 
-                         std::to_string(params.data.L[0]) + file_ending;
-  std::string HiggsProp_file = params.data.outpath + "/HiggsPropagator.T" + 
-                               std::to_string(params.data.L[0]) + file_ending;
-  std::string GoldstoneProp_file = params.data.outpath + "/GoldstonePropagator.T" + 
-                                   std::to_string(params.data.L[0]) + file_ending;
+                         std::to_string(params.data.L[0]) + file_ending + ".dat";
+  std::string HiggsGoldstoneProp_file = params.data.outpath + "/HiggsPropagator.T" + 
+                               std::to_string(params.data.L[0]) + file_ending + ".dat";
+  std::string UnprojectedProp_file = params.data.outpath + "/UnProjectedPropagator.T" + 
+                                   std::to_string(params.data.L[0]) + file_ending + ".dat";
+  std::string HiggsGoldstoneCorr_file = params.data.outpath + "/HiggsCorrelator.T" + 
+                               std::to_string(params.data.L[0]) + file_ending + ".dat";
+  std::string UnprojectedCorr_file = params.data.outpath + "/UnProjectedCorrelator.T" + 
+                                   std::to_string(params.data.L[0]) + file_ending + ".dat";
+  std::string AvgPhiDir_file = params.data.outpath + "/AvgPhiDir.T" + 
+                         std::to_string(params.data.L[0]) + file_ending + ".dat";     
+                           
   FILE *f_mag = fopen(mag_file.c_str(), "w"); 
-  FILE *f_Higgs = fopen(HiggsProp_file.c_str(), "wb"); 
-  FILE *f_Goldstone = fopen(GoldstoneProp_file.c_str(), "wb"); 
-  if (f_mag == NULL || f_Higgs == NULL || f_Goldstone == NULL) {
+  FILE *f_HiggsGoldstoneProp = fopen(HiggsGoldstoneProp_file.c_str(), "wb"); 
+  FILE *f_UnprojectedProp = fopen(UnprojectedProp_file.c_str(), "wb");
+  FILE *f_HiggsGoldstoneCorr = fopen(HiggsGoldstoneCorr_file.c_str(), "wb"); 
+  FILE *f_UnprojectedCorr = fopen(UnprojectedCorr_file.c_str(), "wb");
+  FILE *f_AvgPhiDir = fopen(AvgPhiDir_file.c_str(), "w");
+  
+
+  if (f_mag == NULL || f_HiggsGoldstoneProp == NULL 
+   ||f_UnprojectedProp == NULL || f_HiggsGoldstoneCorr == NULL ||
+   f_UnprojectedCorr == NULL ||
+   f_AvgPhiDir == NULL) {
       cout << params.data.outpath << endl;
-      printf("Error opening data file for mag or props\n");
+      printf("Error opening data files\n");
       exit(1);
   }
   
   // Propagator initiation ****************************************************
   // ini FFT by creating a plan at first
-  int howmanyFFTs = 5;
-  fftw_complex* output = new fftw_complex[5*V]; 
+  fftw_complex* output = new fftw_complex[4*V]; 
  
   int n[4],inembed[4],onembed[4];
   for (int j = 0; j < 4; j++){
@@ -458,8 +450,15 @@ int main(int argc, char** argv) {
     onembed[j] = params.data.L[j];
   }
   
-  fftw_plan Plan = fftw_plan_many_dft(4, n, 5, &(output[0]), inembed, 5, 1,
-	   		                              &(output[0]), onembed, 5, 1,
+  fftw_plan Plan = fftw_plan_many_dft(4, n, 4, &(output[0]), inembed, 4, 1,
+	   		                              &(output[0]), onembed, 4, 1,
+	  			                            FFTW_FORWARD, FFTW_MEASURE);
+	  			                            
+	fftw_complex* Unprojected_output = new fftw_complex[4*V]; 
+   
+  fftw_plan Unprojected_Plan = fftw_plan_many_dft(4, n, 4, &(Unprojected_output[0]), 
+                                      inembed, 4, 1,
+	   		                              &(Unprojected_output[0]), onembed, 4, 1,
 	  			                            FFTW_FORWARD, FFTW_MEASURE);
   
   // create a list of \sum sin^2(P/2)
@@ -496,6 +495,13 @@ int main(int argc, char** argv) {
   printf("\n\n\tThere are %d distinct momenta in the end.\n",SlotCnt);
   std::sort(DifferentMomenta.begin(), DifferentMomenta.end());
   
+  // initlize correlator observables
+  std::vector<double> UnprojectedCorrelator(4*params.data.L[0]);
+  std::vector<double> HiggsGoldstoneCorrelator(4*params.data.L[0]);
+  std::vector<double> HiggsCorrelator(params.data.L[0]);
+  
+  // DIR
+  std::array<double,4> AvgPhiDir;
 
   // The update ----------------------------------------------------------------
   for(int ii = 0; ii < params.data.start_measure+params.data.total_measure; ii++) {
@@ -521,7 +527,8 @@ int main(int argc, char** argv) {
     // compute observables every ZZZ configuration
     if(ii > params.data.start_measure &&
        ii%params.data.measure_every_X_updates == 0){
-       
+      
+      
       mdp_field<std::array<double, 4> > phi_rot(phi); // copy field
       rotate_phi_field(phi_rot, x, double(V)); 
       M = compute_magnetisation(phi_rot, x);
@@ -530,27 +537,42 @@ int main(int argc, char** argv) {
       fprintf(f_mag, "%.14lf\n", M/V);
       fflush(f_mag);      
       
+      // save average vector field...
+      get_phi_field_unit_vec(phi, x, AvgPhiDir);
+      fprintf(f_AvgPhiDir, "%.14lf %.14lf %.14lf %.14lf\n", 
+      AvgPhiDir[0], AvgPhiDir[1], AvgPhiDir[2], AvgPhiDir[3]);
+      fflush(f_AvgPhiDir);
+      
 
     	///// Propagator working zone
     	// get re-scaled field.
     	mdp_field< std::array<double, 4> > phi_rescale(phi);
-            Rescale(phi_rescale, phi, x, 2*params.data.kappa);
+      Rescale(phi_rescale, x, 2*params.data.kappa);
+    	mdp_field< std::array<double, 4> > phi_rescale_rot(phi_rot);
+      Rescale(phi_rescale_rot, x, 2*params.data.kappa);
     	
     	// get projected modes
-    	Projection(phi_rescale, x, output);
+    	Not_Projection(phi_rescale_rot, x, output);
+    	
+    	// get not-projected modes
+    	Not_Projection(phi_rescale, x, Unprojected_output);
             
     	// execute plan
     	fftw_execute(Plan);
+    	fftw_execute(Unprojected_Plan);
     	
     	const int keep_components = 100;
-    	std::array<double,keep_components> HiggsPropOut, GoldstonePropOut;
+    	std::array<double,4*keep_components> HiggsGoldstonePropOut;
+    	std::array<double,4*keep_components> PropagatorOut;
     	
     	// computing components
-    	for (int j = 0; j < keep_components; j++){	
-    	  HiggsPropOut[j] = 
-          GetHiggsComponent(output, sinPSqr, DifferentMomenta, j, V);
-    	  GoldstonePropOut[j] = 
-          GetGoldstoneComponent(output, sinPSqr, DifferentMomenta, j, V);
+    	for (int j = 0; j < keep_components; j++){         
+        for (int k = 0; k < 4; k ++){
+            HiggsGoldstonePropOut[4*j+k] = GetPropComponent(output,
+            sinPSqr, DifferentMomenta, j, V, k);
+            PropagatorOut[4*j+k] = GetPropComponent(Unprojected_output,
+            sinPSqr, DifferentMomenta, j, V, k);
+          }
     	}
       // writing data to file
 //      for (int l = 0; l < keep_components-1; l++){
@@ -560,13 +582,33 @@ int main(int argc, char** argv) {
 //      fprintf(f_Higgs, "%.14lf \n", HiggsPropOut[keep_components-1]);
 //      fprintf(f_Goldstone, "%.14lf \n", GoldstonePropOut[keep_components-1]);
 
-      fwrite(&HiggsPropOut[0], sizeof(double), keep_components, f_Higgs);
-      fflush(f_Higgs);
-      fwrite(&GoldstonePropOut[0], sizeof(double), keep_components, f_Goldstone);
-      fflush(f_Goldstone);
+      fwrite(&HiggsGoldstonePropOut[0], sizeof(double), 4*keep_components, f_HiggsGoldstoneProp);
+      fflush(f_HiggsGoldstoneProp);
+      fwrite(&PropagatorOut[0], sizeof(double), 4*keep_components, f_UnprojectedProp);
+      fflush(f_UnprojectedProp);
+      // end of propagator
+      
+      // correlators
 
+      Compute_UnprojectedCorrelatorObs(phi_rescale,x,UnprojectedCorrelator,rescale_factor);
+      Compute_UnprojectedCorrelatorObs(phi_rescale_rot,x,HiggsGoldstoneCorrelator,rescale_factor);
+      //Compute_HiggsCorrelatorObs(phi_rescale,x,HiggsCorrelator,rescale_factor);
+      
+      fwrite(&HiggsGoldstoneCorrelator[0], sizeof(double), 4*params.data.L[0], f_HiggsGoldstoneCorr);
+      fflush(f_HiggsGoldstoneCorr);
+      fwrite(&UnprojectedCorrelator[0], sizeof(double), 4*params.data.L[0], f_UnprojectedCorr);
+      fflush(f_UnprojectedCorr);
+      //end of correlators
+      
+      /*
+      mdp << "Correlator Components : " ;
+      for(std::vector<int>::size_type i = 0; i != HiggsCorrelator.size(); i++)
+        mdp << " " << HiggsCorrelator[i] << "\t" << HiggsGoldstoneCorrelator[4*i] << endl;
+      mdp << endl;
+      */
+      
       clock_t end = clock(); // end time for one update step
-      mdp << ii << "\tmag after rot = " << M/V;
+      mdp << "\n" << ii << "\tmag after rot = " << M/V;
       mdp << "  \tacc. rate = " << acc/V 
           << "  \tcluster size = " << 100.*cluster_size/V 
           << "  \ttime for 1 update= " << double(end - begin) / CLOCKS_PER_SEC 
@@ -577,9 +619,14 @@ int main(int argc, char** argv) {
   
   // end everything
   fftw_destroy_plan(Plan);
+  fftw_destroy_plan(Unprojected_Plan);
 
-  fclose(f_Higgs);
-  fclose(f_Goldstone);
+  fclose(f_HiggsGoldstoneProp);
+  fclose(f_UnprojectedProp);
+  fclose(f_HiggsGoldstoneCorr); 
+  fclose(f_UnprojectedCorr);
+  fclose(f_AvgPhiDir);
+
   fclose(f_mag);
 
   mdp.close_wormholes();

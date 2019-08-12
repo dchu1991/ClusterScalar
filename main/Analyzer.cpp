@@ -50,7 +50,7 @@ inline void get_phi_field_unit_vec(mdp_field<std::array<double, 4> >& phi,
     dir[3] += phi(x)[3];
   }
   inv_length = 1/sqrt( dir[0]*dir[0] + dir[1]*dir[1] +
-		           dir[2]*dir[2] + dir[3]*dir[3] );
+		                   dir[2]*dir[2] + dir[3]*dir[3] );
   for (int i = 0; i < 4; i++)
     dir[i] *= inv_length; // such that ||dir|| = 1
 
@@ -69,8 +69,7 @@ inline void Rescale(mdp_field<std::array<double, 4> >& phi_rescale,
 ////////////////////////////////////////////////////////////////////////////////
 inline void Projection(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
 		                   fftw_complex* const output){
-		                   //std::vector<fftw_complex>& output){
-
+		                   
   std::array<double,4> dir;
   get_phi_field_unit_vec(phi, x, dir);
   
@@ -78,7 +77,7 @@ inline void Projection(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
     // compute Higgs Projection
     output[5*x.global_index()+0][0] = 
                        phi(x)[0]*dir[0] + phi(x)[1]*dir[1] +
-		       phi(x)[2]*dir[2] + phi(x)[3]*dir[3];
+		                   phi(x)[2]*dir[2] + phi(x)[3]*dir[3];
 
     // compute Goldstone Projection
     for (int i = 0; i < 4; i++) 
@@ -91,7 +90,6 @@ inline void Projection(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
 } // fingers crossed...
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-//double HProp(int comp, std::vector<fftw_complex>& output, const double V){
 inline double HProp(const int comp, fftw_complex const * const output, const double V){
   double tmp = output[5*comp+0][0] * output[5*comp+0][0] +
                output[5*comp+0][1] * output[5*comp+0][1];
@@ -99,7 +97,6 @@ inline double HProp(const int comp, fftw_complex const * const output, const dou
 }
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-//double GProp(int comp, std::vector<fftw_complex>& output, const double V){
 inline double GProp(const int comp, fftw_complex const * const output, const double V){
   double tmp = 0.0;
   for (int i = 1; i < 5; i++)
@@ -156,10 +153,57 @@ inline double GetGoldstoneComponent(fftw_complex const * const output,
   }
   return tmp/counter;
 }
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+
+// holy shit......
+
 
 ////////////////////////////////////////////////////////////////////////////////
-//////////////////// Only these are necessary, I hope... ///////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+inline void Not_Projection(mdp_field<std::array<double, 4> >& phi, mdp_site& x,
+		                    fftw_complex* const output){
+		                   
+  std::array<double,4> dir;
+  get_phi_field_unit_vec(phi, x, dir);
+  
+  forallsites(x){
+    for(int i = 0; i < 4 ; i++){
+      output[4*x.global_index()+i][0] = phi(x)[i];
+      output[4*x.global_index()+i][1] = 0.0;
+    }
+  }
+}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+inline double PropComponent(const int comp, fftw_complex const * const output,
+                   const double V, const int i){
+  double tmp = output[4*comp+i][0] * output[4*comp+i][0] +
+               output[4*comp+i][1] * output[4*comp+i][1];
+  return tmp/V;
+}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+inline double GetPropComponent(fftw_complex const * const output,
+                    const std::vector<double>& sinPSqr, 
+                    const std::vector<double>& DifferentMomenta, 
+                    const int comp, const int V, const int j){
+  int counter = 0;
+  double tmp = 0.0;
+  for (int i = 0; i < V; i++){
+    if ( fabs(DifferentMomenta[comp]-sinPSqr[i]) < 1E-9 ){
+      tmp += PropComponent(i, output, V, j);
+      counter++;
+    }
+  }
+  return tmp/counter;
+}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -429,18 +473,22 @@ int main(int argc, char** argv) {
                             ".Z" + std::to_string(params.data.L[3]) +
                             ".kap" + std::to_string(params.data.kappa) + 
                             ".lam" + std::to_string(params.data.lambda) + 
-                            ".rep_" + std::to_string(params.data.replica) + 
-                            ".dat";
+                            ".rep_" + std::to_string(params.data.replica);
   std::string mag_file = params.data.outpath + "/mag.T" + 
-                         std::to_string(params.data.L[0]) + file_ending;
+                         std::to_string(params.data.L[0]) + file_ending + ".dat";
   std::string HiggsProp_file = params.data.outpath + "/HiggsPropagator.T" + 
-                               std::to_string(params.data.L[0]) + file_ending;
+                               std::to_string(params.data.L[0]) + file_ending + ".dat";
   std::string GoldstoneProp_file = params.data.outpath + "/GoldstonePropagator.T" + 
-                                   std::to_string(params.data.L[0]) + file_ending;
+                                   std::to_string(params.data.L[0]) + file_ending+ ".dat";
+  std::string UnprojectedProp_file = params.data.outpath + "/UnProjectedPropagator.T" + 
+                                   std::to_string(params.data.L[0]) + file_ending + ".dat";
   FILE *f_mag = fopen(mag_file.c_str(), "w"); 
   FILE *f_Higgs = fopen(HiggsProp_file.c_str(), "wb"); 
   FILE *f_Goldstone = fopen(GoldstoneProp_file.c_str(), "wb"); 
-  if (f_mag == NULL || f_Higgs == NULL || f_Goldstone == NULL) {
+  FILE *f_UnprojectedProp = fopen(UnprojectedProp_file.c_str(), "wb");
+
+  if (f_mag == NULL || f_Higgs == NULL || f_Goldstone == NULL
+   ||f_UnprojectedProp == NULL ) {
       cout << params.data.outpath << endl;
       printf("Error opening data file for mag or props\n");
       exit(1);
@@ -448,7 +496,7 @@ int main(int argc, char** argv) {
   
   // Propagator initiation ****************************************************
   // ini FFT by creating a plan at first
-  int howmanyFFTs = 5;
+  //int howmanyFFTs = 5;
   fftw_complex* output = new fftw_complex[5*V]; 
  
   int n[4],inembed[4],onembed[4];
@@ -460,6 +508,13 @@ int main(int argc, char** argv) {
   
   fftw_plan Plan = fftw_plan_many_dft(4, n, 5, &(output[0]), inembed, 5, 1,
 	   		                              &(output[0]), onembed, 5, 1,
+	  			                            FFTW_FORWARD, FFTW_MEASURE);
+	  			                            
+	fftw_complex* Unprojected_output = new fftw_complex[4*V]; 
+   
+  fftw_plan Unprojected_Plan = fftw_plan_many_dft(4, n, 4, &(Unprojected_output[0]), 
+                                      inembed, 4, 1,
+	   		                              &(Unprojected_output[0]), onembed, 4, 1,
 	  			                            FFTW_FORWARD, FFTW_MEASURE);
   
   // create a list of \sum sin^2(P/2)
@@ -522,6 +577,13 @@ int main(int argc, char** argv) {
     if(ii > params.data.start_measure &&
        ii%params.data.measure_every_X_updates == 0){
        
+      // save config
+      std::string Conf_file = params.data.outpath + "/Confs/ScalarConf.T" + 
+                          std::to_string(params.data.L[0]) + file_ending + 
+                          ".conf" + std::to_string(ii) + ".dat";
+      phi.save(Conf_file.c_str());
+       
+      
       mdp_field<std::array<double, 4> > phi_rot(phi); // copy field
       rotate_phi_field(phi_rot, x, double(V)); 
       M = compute_magnetisation(phi_rot, x);
@@ -534,16 +596,21 @@ int main(int argc, char** argv) {
     	///// Propagator working zone
     	// get re-scaled field.
     	mdp_field< std::array<double, 4> > phi_rescale(phi);
-            Rescale(phi_rescale, phi, x, 2*params.data.kappa);
+      Rescale(phi_rescale, phi, x, 2*params.data.kappa);
     	
     	// get projected modes
     	Projection(phi_rescale, x, output);
+    	
+    	// get not-projected modes
+    	Not_Projection(phi_rescale, x, Unprojected_output);
             
     	// execute plan
     	fftw_execute(Plan);
+    	fftw_execute(Unprojected_Plan);
     	
     	const int keep_components = 100;
     	std::array<double,keep_components> HiggsPropOut, GoldstonePropOut;
+    	std::array<double,4*keep_components> PropagatorOut;
     	
     	// computing components
     	for (int j = 0; j < keep_components; j++){	
@@ -551,6 +618,10 @@ int main(int argc, char** argv) {
           GetHiggsComponent(output, sinPSqr, DifferentMomenta, j, V);
     	  GoldstonePropOut[j] = 
           GetGoldstoneComponent(output, sinPSqr, DifferentMomenta, j, V);
+          for (int k = 0; k < 4; k ++){
+            PropagatorOut[4*j+k] = GetPropComponent(Unprojected_output,
+            sinPSqr, DifferentMomenta, j, V, k);
+          }
     	}
       // writing data to file
 //      for (int l = 0; l < keep_components-1; l++){
@@ -564,9 +635,11 @@ int main(int argc, char** argv) {
       fflush(f_Higgs);
       fwrite(&GoldstonePropOut[0], sizeof(double), keep_components, f_Goldstone);
       fflush(f_Goldstone);
+      fwrite(&PropagatorOut[0], sizeof(double), 4*keep_components, f_UnprojectedProp);
+      fflush(f_UnprojectedProp);
 
       clock_t end = clock(); // end time for one update step
-      mdp << ii << "\tmag after rot = " << M/V;
+      mdp << "\n" << ii << "\tmag after rot = " << M/V;
       mdp << "  \tacc. rate = " << acc/V 
           << "  \tcluster size = " << 100.*cluster_size/V 
           << "  \ttime for 1 update= " << double(end - begin) / CLOCKS_PER_SEC 
@@ -577,6 +650,7 @@ int main(int argc, char** argv) {
   
   // end everything
   fftw_destroy_plan(Plan);
+  fftw_destroy_plan(Unprojected_Plan);
 
   fclose(f_Higgs);
   fclose(f_Goldstone);

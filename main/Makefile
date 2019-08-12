@@ -18,7 +18,8 @@ all: rmxeq mkdep mkxeq
 
 # main programs and modules to be compiled
 
-MAIN = run_cluster_with_Prop
+MAIN = XYmodel 
+#### MAIN = test
 
 UTILS = 
 
@@ -43,18 +44,17 @@ LIBS = fftw3
 LIBPATH = /usr/local/lib
 
 # scheduling and optimization options
-CFLAGS = -Wall -pedantic -std=c++11 -O2 -ipo -axCORE-AVX2 \
-         -mtune=native -march=native -lfftw3 \
-         -Wno-unused-variable -Wno-sign-compare -Wno-sequence-point
-#CFLAGS = -Wall -pedantic -std=c++11 -march=native -DLINUX -O3 \
-#         -Wno-unused-variable -Wno-unused-local-typedefs -Wno-sign-compare \
-#         -Wno-sequence-point
-#         -lboost_system -lboost_filesystem
+#CFLAGS = -Wall -pedantic -std=c++11 -O2 -ipo -axCORE-AVX2 \
+#         -mtune=native -march=native -lfftw3 \
+#         -Wno-unused-variable -Wno-sign-compare -Wno-sequence-point
+CFLAGS = -w -Wall -pedantic -std=c++11 -march=native -DLINUX -O2 \
+         -Wno-unused-variable -Wno-unused-local-typedefs -Wno-sign-compare \
+         -Wno-sequence-point  \
+#				 -lboost_system -lboost_filesystem
 ######################## Be careful when changing ##############################
 
 SHELL=/bin/bash
-#CC=g++
-CC=icpc
+CC=g++-6
 CLINKER=$(CC)
 
 PGMS= $(MAIN) $(MODULES)
