@@ -6,6 +6,7 @@ In the main folder you also find an example input file "input.in" and an input f
 
 After compiling run_cluster.cpp you can run the program with "./run_cluster -i infile.in" .
 
-At the moment the only observable which is computed is magnetisation, which will be writtin in its own file with a name created directly from the program. The MonteCarlo parameters are NOT part of the fielname, so be carful not to override it, when changing this. The output is ASCII at the moment.
+At the moment the observables can be computed are magnetisation, propagators, and correlators, which will be writtin in its own file with a name created directly from the program. 
+The MonteCarlo parameters are NOT part of the fielname, so be carful not to override it, when changing this. Check the output for ASCII or Binary.
 
 Have fun!
